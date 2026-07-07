@@ -94,10 +94,17 @@ html,body{width:100%;height:100%;overflow:hidden;background:linear-gradient(135d
 /* Time bonus display on complete */
 .time-bonus{font-size:20px;color:#00e5ff;font-weight:700;text-shadow:0 0 10px rgba(0,229,255,0.5)}
 .level-info-badge{display:inline-block;background:rgba(255,255,255,0.1);padding:4px 12px;border-radius:8px;font-size:12px;margin:4px 0}
+.loading-spinner{width:38px;height:38px;border:4px solid rgba(255,255,255,0.15);border-top-color:#ffd54f;border-radius:50%;animation:spin .8s linear infinite;margin-top:16px}
+@keyframes spin{to{transform:rotate(360deg)}}
 </style>
 </head>
 <body>
-<div id="menuScreen" class="screen active">
+<div id="loadingScreen" class="screen active">
+  <div class="menu-title" style="font-size:min(12vw,44px)">GEM VAULT</div>
+  <div class="loading-spinner"></div>
+  <div class="menu-sub" style="margin-top:14px">Loading...</div>
+</div>
+<div id="menuScreen" class="screen">
   <div class="menu-title">GEM VAULT</div>
   <div class="menu-sub">Match-3 Puzzle</div>
   <div class="coins-bar">💰 <span id="menuCoins">0</span></div>
@@ -178,11 +185,10 @@ html,body{width:100%;height:100%;overflow:hidden;background:linear-gradient(135d
 <div class="confetti" id="confetti"></div>
 <div class="particle-layer" id="particleLayer"></div>
 
-<script src="https://www.youtube.com/game_api/v1" async defer></script>
+<script src="https://www.youtube.com/game_api/v1"></script>
 <script>
-try{(function(){
+try{(async function(){
 try{if(typeof ytgame!=='undefined'&&ytgame.game)ytgame.game.firstFrameReady()}catch(e){}
-setTimeout(function(){try{if(typeof ytgame!=='undefined'&&ytgame.game)ytgame.game.gameReady()}catch(e){}},300);
 
 var actx=null,audioOn=true;
 function ia(){if(!actx)try{actx=new(window.AudioContext||window.webkitAudioContext)}catch(e){}}
@@ -195,7 +201,7 @@ function sndChest(){ia();tn(440,0.1,0.05);setTimeout(function(){tn(660,0.1,0.05)
 function sndClick(){ia();tn(500,0.03,0.03)}
 function sndFail(){ia();tn(300,0.2,0.06);setTimeout(function(){tn(200,0.3,0.05)},150)}
 function sndTick(){ia();tn(800,0.03,0.02)}
-function sndTimeWarn(){ia();tn(600,0.08,0.06,'square');setTimeout(function(){tn(800,0.08,0.06,'square'),100})}
+function sndTimeWarn(){ia();tn(600,0.08,0.06,'square');setTimeout(function(){tn(800,0.08,0.06,'square')},100)}
 
 var GEMS=['💎','🔷','🔶','⭐','🔴','🟢'];
 var GEM_COLS=['#64b5f6','#1e88e5','#ff9800','#ffd54f','#ef5350','#66bb6a'];
@@ -220,9 +226,31 @@ var isAnimating=false,gameProgress=0;
 var combo=0,lastMatchTime=0,comboTime=2.0;
 var shakeEl=null,particleLayer=null,timerInterval=null,lastTickSec=0;
 
-function save(){try{localStorage.setItem('gv_save',JSON.stringify({coins:coins,levels:levelData,powerups:powerups}))}catch(e){}}
-function load(){try{var s=JSON.parse(localStorage.getItem('gv_save'));if(s){coins=s.coins||0;levelData=s.levels||[];powerups=s.powerups||{hint:2,shuffle:1,moves:1,bomb:1}}}catch(e){}}
-load();
+var YT_ENV=false;try{YT_ENV=typeof ytgame!=='undefined'&&ytgame.IN_PLAYABLES_ENV}catch(e){}
+var highScore=0;
+function save(){
+  var payload=JSON.stringify({coins:coins,levels:levelData,powerups:powerups,highScore:highScore});
+  try{
+    if(YT_ENV&&typeof ytgame!=='undefined'&&ytgame.game&&ytgame.game.saveData){
+      ytgame.game.saveData(payload).catch(function(){try{localStorage.setItem('gv_save',payload)}catch(e){}});
+    }else{
+      localStorage.setItem('gv_save',payload);
+    }
+  }catch(e){try{localStorage.setItem('gv_save',payload)}catch(e2){}}
+}
+async function load(){
+  var raw=null;
+  try{
+    if(YT_ENV&&typeof ytgame!=='undefined'&&ytgame.game&&ytgame.game.loadData){
+      raw=await ytgame.game.loadData();
+    }
+  }catch(e){}
+  if(!raw){try{raw=localStorage.getItem('gv_save')}catch(e){}}
+  try{
+    var s=JSON.parse(raw);
+    if(s){coins=s.coins||0;levelData=s.levels||[];powerups=s.powerups||{hint:2,shuffle:1,moves:1,bomb:1};highScore=s.highScore||0}
+  }catch(e){}
+}
 
 function showScreen(id){document.querySelectorAll('.screen').forEach(function(s){s.classList.remove('active')});document.getElementById(id).classList.add('active')}
 function showMenu(){showScreen('menuScreen');document.getElementById('menuCoins').textContent=coins}
@@ -305,14 +333,17 @@ function updatePowerUI(){
 
 function initGrid(){
   grid=[];
-  for(var r=0;r<ROWS;r++){grid[r]=[];for(var c=0;c<COLS;c++){var g;do{g=Math.floor(Math.random()*GEMS.length)}while((c>=2&&grid[r][c-1]===g&&grid[r][c-2]===g)||(r>=2&&grid[r-1][c]===g&&grid[r-2][c]===g));grid[r][c]={type:g,spec:null}}}
+  for(var r=0;r<ROWS;r++){grid[r]=[];for(var c=0;c<COLS;c++){var g;do{g=Math.floor(Math.random()*GEMS.length)}while((c>=2&&grid[r][c-1].type===g&&grid[r][c-2].type===g)||(r>=2&&grid[r-1][c].type===g&&grid[r-2][c].type===g));grid[r][c]={type:g,spec:null}}}
+  var guard=0;while(!findValidMove()&&guard<30){shuffleGrid();guard++}
 }
 
 function renderGrid(){
   var el=document.getElementById('grid');
   el.style.gridTemplateColumns='repeat('+COLS+',1fr)';
-  el.style.width=Math.min(window.innerWidth-24,COLS*48)+'px';
-  el.style.height=el.style.width;
+  var availH=window.innerHeight-58-56-24;
+  var size=Math.max(160,Math.min(window.innerWidth-24,availH,COLS*48));
+  el.style.width=size+'px';
+  el.style.height=size+'px';
   el.innerHTML='';
   for(var r=0;r<ROWS;r++){for(var c=0;c<COLS;c++){
     var cell=document.createElement('div');cell.className='cell';
@@ -469,6 +500,13 @@ function dropGems(){
       combo++;
       lastMatchTime=Date.now();
       processMatches(matches);
+    }else if(!findValidMove()){
+      shuffleGrid();renderGrid();
+      setTimeout(function(){
+        var m2=findAllMatches();
+        if(m2.length>0){combo++;lastMatchTime=Date.now();processMatches(m2)}
+        else{isAnimating=false;combo=0;updateHUD();checkLevelEnd()}
+      },350);
     }else{
       isAnimating=false;combo=0;
       updateHUD();checkLevelEnd();
@@ -536,7 +574,12 @@ function levelComplete(){
   if(!levelData[currentLevel])levelData[currentLevel]={};
   levelData[currentLevel].completed=true;
   if(!levelData[currentLevel].stars||stars>levelData[currentLevel].stars)levelData[currentLevel].stars=stars;
-  coins+=earnedCoins;save();
+  coins+=earnedCoins;
+  if(gameScore>highScore){
+    highScore=gameScore;
+    try{if(typeof ytgame!=='undefined'&&ytgame.engagement)ytgame.engagement.sendScore({value:Math.floor(highScore)})}catch(e){}
+  }
+  save();
 
   showScreen('completeScreen');
   for(var i=1;i<=3;i++)document.getElementById('s'+i).className='s';
@@ -585,6 +628,7 @@ function usePower(type){
   }else if(type==='shuffle'){
     if((powerups.shuffle||0)<=0)return;
     powerups.shuffle--;save();updatePowerUI();sndClick();
+    isAnimating=true;
     shuffleGrid();renderGrid();
     setTimeout(function(){var m=findAllMatches();if(m.length>0){combo=1;lastMatchTime=Date.now();processMatches(m)}else isAnimating=false},100);
   }else if(type==='moves'){
@@ -593,6 +637,7 @@ function usePower(type){
   }else if(type==='bomb'){
     if((powerups.bomb||0)<=0)return;
     powerups.bomb--;save();updatePowerUI();sndClick();
+    isAnimating=true;
     var counts=[0,0,0,0,0,0];
     for(var r=0;r<ROWS;r++)for(var c=0;c<COLS;c++)if(grid[r][c])counts[grid[r][c].type]++;
     var maxG=0;for(var i=1;i<6;i++)if(counts[i]>counts[maxG])maxG=i;
@@ -621,10 +666,23 @@ function spawnConfetti(){
   setTimeout(function(){el.innerHTML=''},2500);
 }
 
-try{if(typeof ytgame!=='undefined'&&ytgame.system){ytgame.system.onPause(function(){stopTimer()});ytgame.system.onResume(function(){if(timeLeft>0&&isAnimating===false)startTimer()});ytgame.system.onAudioEnabledChange(function(en){audioOn=en})}}catch(e){}
+try{
+  if(typeof ytgame!=='undefined'&&ytgame.system){
+    try{audioOn=ytgame.system.isAudioEnabled?ytgame.system.isAudioEnabled():true}catch(e){}
+    ytgame.system.onPause(function(){stopTimer();save()});
+    ytgame.system.onResume(function(){if(timeLeft>0&&!isAnimating)startTimer()});
+    ytgame.system.onAudioEnabledChange(function(en){audioOn=en});
+  }
+}catch(e){}
+
+window.addEventListener('resize',function(){if(document.getElementById('gameScreen').classList.contains('active'))renderGrid()});
+document.addEventListener('keydown',function(e){if(e.key==='Escape'&&document.getElementById('rewardOverlay').classList.contains('active'))closeReward()});
 
 window.showMenu=showMenu;window.showLevelMap=showLevelMap;window.showShop=showShop;window.startLevel=startLevel;window.usePower=usePower;window.openChest=openChest;window.nextLevel=nextLevel;window.retryLevel=retryLevel;window.buyPower=buyPower;window.closeReward=closeReward;
+
+await load();
 showMenu();
+try{if(typeof ytgame!=='undefined'&&ytgame.game)ytgame.game.gameReady()}catch(e){}
 })()}catch(e){document.body.innerHTML='<pre style="color:#ff5555;padding:20px">'+e+'</pre>'}
 </script>
 </body>
