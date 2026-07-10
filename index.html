@@ -260,7 +260,8 @@ function drawBg(dt){
 }
 
 var actx=null,audioUnlocked=false,audioEnabled=true,bgmPlaying=false,bgmOsc1=null,bgmOsc2=null,bgmGain=null;
-function tn(f,d,v,tp){if(!audioUnlocked||!audioEnabled||!actx)return;try{var o=actx.createOscillator(),g=actx.createGain();o.type=tp||'sine';o.frequency.value=f;g.gain.setValueAtTime(v||0.15,actx.currentTime);g.gain.exponentialRampToValueAtTime(0.001,actx.currentTime+d);o.connect(g);g.connect(actx.destination);o.start();o.stop(actx.currentTime+d)}catch(e){}}
+function keepAudioAlive(){if(!actx||!audioUnlocked||actx.state==='running')return;actx.resume()}
+function tn(f,d,v,tp){if(!audioUnlocked||!audioEnabled||!actx)return;try{if(actx.state==='suspended')actx.resume();var o=actx.createOscillator(),g=actx.createGain();o.type=tp||'sine';o.frequency.value=f;g.gain.setValueAtTime(v||0.15,actx.currentTime||0);g.gain.exponentialRampToValueAtTime(0.001,(actx.currentTime||0)+d);o.connect(g);g.connect(actx.destination);o.start();o.stop((actx.currentTime||0)+d)}catch(e){}}
 function sndMatch(c){tn(440+c*60,.1,.15);setTimeout(function(){tn((440+c*60)*1.25,.08,.12)},50);if(c>=3)setTimeout(function(){tn((440+c*60)*1.5,.12,.1)},100)}
 function sndBig(){tn(523,.1,.18);setTimeout(function(){tn(659,.1,.15)},70);setTimeout(function(){tn(784,.1,.15)},140);setTimeout(function(){tn(1047,.15,.12)},210)}
 function sndSpecial(){tn(880,.1,.18);setTimeout(function(){tn(1100,.1,.15)},70);setTimeout(function(){tn(1320,.15,.15)},140)}
@@ -274,7 +275,7 @@ function sndAchieve(){tn(523,.12,.18);setTimeout(function(){tn(659,.12,.15)},110
 function sndEvent(){tn(880,.08,.12);setTimeout(function(){tn(1100,.1,.12)},70)}
 function startBGM(){if(!audioUnlocked||bgmPlaying||!actx)return;try{stopBGM();bgmGain=actx.createGain();bgmGain.gain.value=0.05;bgmGain.connect(actx.destination);bgmOsc1=actx.createOscillator();bgmOsc1.type='sine';bgmOsc1.frequency.value=110;bgmOsc2=actx.createOscillator();bgmOsc2.type='triangle';bgmOsc2.frequency.value=165;bgmOsc1.connect(bgmGain);bgmOsc2.connect(bgmGain);bgmOsc1.start();bgmOsc2.start();bgmPlaying=true;function m(){if(!bgmPlaying||!actx)return;try{var n=[110,130.81,146.83,164.81,196,174.61,146.83,130.81][Math.floor(Date.now()/4000)%8];bgmOsc1.frequency.setTargetAtTime(n,actx.currentTime,0.5);bgmOsc2.frequency.setTargetAtTime(n*1.5,actx.currentTime,0.5)}catch(e){}setTimeout(m,4000)}m()}catch(e){}}
 function stopBGM(){bgmPlaying=false;try{if(bgmOsc1){bgmOsc1.stop();bgmOsc1=null}if(bgmOsc2){bgmOsc2.stop();bgmOsc2=null}}catch(e){}}
-function unlockAudio(){if(audioUnlocked)return;try{actx=new(window.AudioContext||window.webkitAudioContext)}catch(e){showToast('Audio not supported');return}if(actx.state==='suspended')actx.resume();audioUnlocked=true;showToast('Sound ON!');startBGM()}
+function unlockAudio(){if(audioUnlocked)return;try{actx=new(window.AudioContext||window.webkitAudioContext)}catch(e){showToast('Audio not supported');return}if(actx.state==='suspended')actx.resume();audioUnlocked=true;showToast('Sound ON!');startBGM();setInterval(keepAudioAlive,3000)}
 document.addEventListener('click',unlockAudio,false);
 document.addEventListener('touchstart',unlockAudio,false);
 
