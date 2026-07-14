@@ -4,7 +4,6 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
 <title>Gem Vault</title>
-<script src="https://www.youtube.com/game_api/v1"></script>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 html,body{width:100%;height:100%;overflow:hidden;background:#0a0118;font-family:'Segoe UI',system-ui,sans-serif;touch-action:none;user-select:none;color:#fff}
@@ -236,6 +235,7 @@ html,body{width:100%;height:100%;overflow:hidden;background:#0a0118;font-family:
 
 <script>
 try{(async function(){
+try{var s=document.createElement('script');s.src='https://www.youtube.com/game_api/v1';s.onerror=function(){};document.head.appendChild(s)}catch(e){}
 try{if(typeof ytgame!=='undefined'&&ytgame.game)ytgame.game.firstFrameReady()}catch(e){}
 
 var bgCv=document.getElementById('bgCanvas'),bgCtx=bgCv.getContext('2d');
@@ -261,7 +261,7 @@ function drawBg(dt){
 
 var actx=null,audioUnlocked=false,audioEnabled=true,bgmPlaying=false,bgmOsc1=null,bgmOsc2=null,bgmGain=null;
 try{if(typeof ytgame!=='undefined'&&ytgame.IN_PLAYABLES_ENV&&ytgame.system)audioEnabled=ytgame.system.isAudioEnabled()}catch(e){}
-function tn(f,d,v,tp){if(!audioUnlocked||!audioEnabled||!actx)return;if(actx.state!=='running'){actx.resume();return}try{var o=actx.createOscillator(),g=actx.createGain();o.type=tp||'sine';o.frequency.value=f;g.gain.setValueAtTime(0.15,actx.currentTime);g.gain.exponentialRampToValueAtTime(0.001,actx.currentTime+d);o.connect(g);g.connect(actx.destination);o.start();o.stop(actx.currentTime+d)}catch(e){}}
+function tn(f,d,v,tp){if(!audioUnlocked||!audioEnabled||!actx)return;try{if(actx.state==='suspended')actx.resume();var o=actx.createOscillator(),g=actx.createGain();o.type=tp||'sine';o.frequency.value=f;g.gain.setValueAtTime(0.15,actx.currentTime);g.gain.exponentialRampToValueAtTime(0.001,actx.currentTime+d);o.connect(g);g.connect(actx.destination);o.start();o.stop(actx.currentTime+d)}catch(e){}}
 function sndMatch(c){tn(440+c*60,.1,.15);setTimeout(function(){tn((440+c*60)*1.25,.08,.12)},50);if(c>=3)setTimeout(function(){tn((440+c*60)*1.5,.12,.1)},100)}
 function sndBig(){tn(523,.1,.18);setTimeout(function(){tn(659,.1,.15)},70);setTimeout(function(){tn(784,.1,.15)},140);setTimeout(function(){tn(1047,.15,.12)},210)}
 function sndSpecial(){tn(880,.1,.18);setTimeout(function(){tn(1100,.1,.15)},70);setTimeout(function(){tn(1320,.15,.15)},140)}
@@ -275,7 +275,7 @@ function sndAchieve(){tn(523,.12,.18);setTimeout(function(){tn(659,.12,.15)},110
 function sndEvent(){tn(880,.08,.12);setTimeout(function(){tn(1100,.1,.12)},70)}
 function startBGM(){if(!audioUnlocked||bgmPlaying||!actx)return;try{stopBGM();bgmGain=actx.createGain();bgmGain.gain.value=0.05;bgmGain.connect(actx.destination);bgmOsc1=actx.createOscillator();bgmOsc1.type='sine';bgmOsc1.frequency.value=110;bgmOsc2=actx.createOscillator();bgmOsc2.type='triangle';bgmOsc2.frequency.value=165;bgmOsc1.connect(bgmGain);bgmOsc2.connect(bgmGain);bgmOsc1.start();bgmOsc2.start();bgmPlaying=true;function m(){if(!bgmPlaying||!actx)return;try{var n=[110,130.81,146.83,164.81,196,174.61,146.83,130.81][Math.floor(Date.now()/4000)%8];bgmOsc1.frequency.setTargetAtTime(n,actx.currentTime,0.5);bgmOsc2.frequency.setTargetAtTime(n*1.5,actx.currentTime,0.5)}catch(e){}setTimeout(m,4000)}m()}catch(e){}}
 function stopBGM(){bgmPlaying=false;try{if(bgmOsc1){bgmOsc1.stop();bgmOsc1=null}if(bgmOsc2){bgmOsc2.stop();bgmOsc2=null}}catch(e){}}
-function unlockAudio(){if(audioUnlocked)return;audioUnlocked=true;try{actx=new(window.AudioContext||window.webkitAudioContext)();var og=actx.createGain();og.gain.value=0.0001;var o=actx.createOscillator();o.connect(og);og.connect(actx.destination);o.start();actx.resume().then(function(){showToast('Sound ON!');startBGM()})}catch(e){console.error('Audio init failed:',e);showToast('Audio error: '+e.message)}}
+function unlockAudio(){if(audioUnlocked)return;audioUnlocked=true;try{actx=new(window.AudioContext||window.webkitAudioContext)();if(actx.state==='suspended')actx.resume();showToast('Sound ON!');startBGM()}catch(e){showToast('Audio not supported')}}
 document.addEventListener('click',unlockAudio,false);
 document.addEventListener('touchstart',unlockAudio,false);
 
