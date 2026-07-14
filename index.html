@@ -260,7 +260,7 @@ function drawBg(dt){
 }
 
 var actx=null,audioUnlocked=false,audioEnabled=true,bgmPlaying=false,bgmOsc1=null,bgmOsc2=null,bgmGain=null;
-try{if(typeof ytgame!=='undefined'&&ytgame.system)audioEnabled=ytgame.system.isAudioEnabled()}catch(e){}
+try{if(typeof ytgame!=='undefined'&&ytgame.IN_PLAYABLES_ENV&&ytgame.system)audioEnabled=ytgame.system.isAudioEnabled()}catch(e){}
 function tn(f,d,v,tp){if(!audioUnlocked||!audioEnabled||!actx)return;if(actx.state!=='running'){actx.resume();return}try{var o=actx.createOscillator(),g=actx.createGain();o.type=tp||'sine';o.frequency.value=f;g.gain.setValueAtTime(0.15,actx.currentTime);g.gain.exponentialRampToValueAtTime(0.001,actx.currentTime+d);o.connect(g);g.connect(actx.destination);o.start();o.stop(actx.currentTime+d)}catch(e){}}
 function sndMatch(c){tn(440+c*60,.1,.15);setTimeout(function(){tn((440+c*60)*1.25,.08,.12)},50);if(c>=3)setTimeout(function(){tn((440+c*60)*1.5,.12,.1)},100)}
 function sndBig(){tn(523,.1,.18);setTimeout(function(){tn(659,.1,.15)},70);setTimeout(function(){tn(784,.1,.15)},140);setTimeout(function(){tn(1047,.15,.12)},210)}
